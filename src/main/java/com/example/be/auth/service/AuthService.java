@@ -10,6 +10,7 @@ import com.example.be.user.enums.Provider;
 import com.example.be.user.enums.Role;
 import com.example.be.user.repository.SocialAccountRepository;
 import com.example.be.user.repository.UserRepository;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -62,33 +63,38 @@ public class AuthService {
 
   @Transactional
   public LoginResponse socialLogin(String provider, String providerId, String email, String name) {
-    User user =
-        userRepository
-            .findByEmail(email)
-            .orElseGet(
-                () -> {
-                  User newUser =
-                      User.builder().email(email).password(null).name(name).role(Role.USER).build();
-
-                  return userRepository.save(newUser);
-                });
-
     Provider providerEnum = Provider.valueOf(provider.toUpperCase());
-    socialAccountRepository
-        .findByProviderAndProviderId(providerEnum, providerId)
-        .orElseGet(
-            () -> {
-              SocialAccount newSocialAccount =
-                  SocialAccount.builder()
-                      .provider(providerEnum)
-                      .providerId(providerId)
-                      .user(user)
-                      .build();
+    // 1. 이미 해당 provider로 연동된 소셜 아이디가 있을 경우
+    Optional<SocialAccount> existingSocial =
+        socialAccountRepository.findByProviderAndProviderId(providerEnum, providerId);
 
-              return socialAccountRepository.save(newSocialAccount);
-            });
+    if (existingSocial.isPresent()) {
+      return createTokens(existingSocial.get().getUser());
+    }
 
-    return createTokens(user);
+    // 2. 유저가 있을 경우
+    Optional<User> existingUser = userRepository.findByEmail(email);
+    if (existingUser.isPresent()) {
+      SocialAccount newSocialAccount =
+          createSocialAccount(providerEnum, providerId, existingUser.get());
+      socialAccountRepository.save(newSocialAccount);
+
+      return createTokens(existingUser.get());
+    }
+
+    // 3. 유저도 없고. 소셜도 없을 경우
+    User newUser = User.builder().email(email).password(null).name(name).role(Role.USER).build();
+    userRepository.save(newUser);
+
+    SocialAccount newSocialAccount =
+        createSocialAccount(providerEnum, providerId, existingUser.get());
+    socialAccountRepository.save(newSocialAccount);
+
+    return createTokens(newUser);
+  }
+
+  private SocialAccount createSocialAccount(Provider providerEnum, String providerId, User user) {
+    return SocialAccount.builder().provider(providerEnum).providerId(providerId).user(user).build();
   }
 
   private LoginResponse createTokens(User user) {

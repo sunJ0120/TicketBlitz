@@ -36,11 +36,10 @@ public class QueueScheduler {
 
   @Scheduled(fixedDelay = 10000) // 10초마다 실행한다.
   public void cleanInactiveConcerts() {
-    Set<@NonNull Object> openConcerts =
-        redisTemplate.opsForSet().members(QueueRedisKey.openConcerts());
-    for (Object concertId : openConcerts) {
-      cleanupForConcert((Long) concertId);
-      cleanupActiveForConcert((Long) concertId);
+    Set<Long> openConcertIds = getOpenConcertIds();
+    for (Long concertId : openConcertIds) {
+      cleanupForConcert(concertId);
+      cleanupActiveForConcert(concertId);
     }
   }
 
@@ -53,7 +52,8 @@ public class QueueScheduler {
     }
 
     for (Object userId : members) {
-      String heartbeatKey = QueueRedisKey.heartbeat(concertId, (Long) userId);
+      Long userIdLong = Long.valueOf(userId.toString());
+      String heartbeatKey = QueueRedisKey.heartbeat(concertId, userIdLong);
       Boolean exists = redisTemplate.hasKey(heartbeatKey);
 
       if (Boolean.FALSE.equals(exists)) {
@@ -71,12 +71,13 @@ public class QueueScheduler {
     }
 
     for (Object userId : activeUsers) {
-      String tokenKey = QueueRedisKey.token(concertId, (Long) userId);
+      Long userIdLong = Long.valueOf(userId.toString());
+      String tokenKey = QueueRedisKey.token(concertId, userIdLong);
       Boolean exists = redisTemplate.hasKey(tokenKey);
 
       if (Boolean.FALSE.equals(exists)) {
-        redisTemplate.opsForSet().remove(activeKey, userId);
-        log.info("Active 이탈 처리: concertId={}, userId={}", concertId, userId);
+        redisTemplate.opsForSet().remove(activeKey, userIdLong);
+        log.info("Active 이탈 처리: concertId={}, userId={}", concertId, userIdLong);
       }
     }
   }

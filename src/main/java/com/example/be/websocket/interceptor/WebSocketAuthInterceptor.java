@@ -2,6 +2,8 @@ package com.example.be.websocket.interceptor;
 
 import com.example.be.security.jwt.JwtProvider;
 import com.example.be.websocket.dto.StompPrincipal;
+import com.example.be.websocket.exception.WebSocketAuthException;
+import com.example.be.websocket.exception.WebSocketErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.Message;
@@ -32,16 +34,18 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
 
     String authHeader = accessor.getFirstNativeHeader(AUTHORIZATION_HEADER);
 
-    if (authHeader == null || !authHeader.startsWith(AUTHORIZATION_HEADER_PREFIX)) {
-      log.warn("WebSocket 연결 실패 - Authorization 헤더 없음");
-      throw new IllegalArgumentException("Missing Authorization header");
+    if (authHeader == null) {
+      throw new WebSocketAuthException(WebSocketErrorCode.MISSING_AUTH_HEADER);
+    }
+
+    if (!authHeader.startsWith(AUTHORIZATION_HEADER_PREFIX)) {
+      throw new WebSocketAuthException(WebSocketErrorCode.INVALID_TOKEN_FORMAT);
     }
 
     String token = authHeader.substring(AUTHORIZATION_HEADER_PREFIX.length());
 
     if (!jwtProvider.validateToken(token)) {
-      log.warn("WebSocket 연결 실패 - 유효하지 않은 토큰");
-      throw new IllegalArgumentException("Invalid JWT token");
+      throw new WebSocketAuthException(WebSocketErrorCode.INVALID_TOKEN);
     }
 
     Long userId = jwtProvider.getUserId(token);

@@ -57,7 +57,8 @@ public class QueueScheduler {
       Boolean exists = redisTemplate.hasKey(heartbeatKey);
 
       if (Boolean.FALSE.equals(exists)) {
-        redisTemplate.opsForZSet().remove(queueKey, userId);
+        redisTemplate.opsForZSet().remove(queueKey, userIdLong);
+        log.info("Queue 이탈 처리: concertId={}, userId={}", concertId, userIdLong);
       }
     }
   }

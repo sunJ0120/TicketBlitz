@@ -64,7 +64,7 @@ public class QueueScheduler {
 
   private void cleanupActiveForConcert(Long concertId) {
     String activeKey = QueueRedisKey.active(concertId);
-    Set<Object> activeUsers = redisTemplate.opsForZSet().range(activeKey, 0, -1);
+    Set<Object> activeUsers = redisTemplate.opsForSet().members(activeKey);
 
     if (activeUsers == null || activeUsers.isEmpty()) {
       return;

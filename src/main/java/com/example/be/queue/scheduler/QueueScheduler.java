@@ -34,6 +34,33 @@ public class QueueScheduler {
     }
   }
 
+  @Scheduled(fixedDelay = 10000) // 10초마다 실행한다.
+  public void cleanInactiveConcerts() {
+    Set<@NonNull Object> openConcerts =
+        redisTemplate.opsForSet().members(QueueRedisKey.openConcerts());
+    for (Object concertId : openConcerts) {
+      cleanupForConcert((Long) concertId);
+    }
+  }
+
+  private void cleanupForConcert(Long concertId) {
+    String queueKey = QueueRedisKey.queue(concertId);
+    Set<Object> members = redisTemplate.opsForZSet().range(queueKey, 0, -1);
+
+    if (members == null || members.isEmpty()) { // 대기열이 비어 있을 경우 불필요한 순회 방지
+      return;
+    }
+
+    for (Object userId : members) {
+      String heartbeatKey = QueueRedisKey.heartbeat(concertId, (Long) userId);
+      Boolean exists = redisTemplate.hasKey(heartbeatKey);
+
+      if (Boolean.FALSE.equals(exists)) {
+        redisTemplate.opsForZSet().remove(queueKey, userId);
+      }
+    }
+  }
+
   private Set<Long> getOpenConcertIds() {
     String key = QueueRedisKey.openConcerts();
     Set<Object> members = redisTemplate.opsForSet().members(key);

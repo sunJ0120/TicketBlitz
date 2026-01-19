@@ -92,6 +92,6 @@ public class QueueService {
 
   private void refreshHeartbeat(Long concertId, Long userId) {
     String heartbeatKey = QueueRedisKey.heartbeat(concertId, userId);
-    redisTemplate.expire(heartbeatKey, Duration.ofSeconds(30));
+    redisTemplate.opsForValue().set(heartbeatKey, "1", Duration.ofSeconds(30));
   }
 }

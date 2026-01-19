@@ -34,6 +34,55 @@ public class QueueScheduler {
     }
   }
 
+  @Scheduled(fixedDelay = 10000) // 10초마다 실행한다.
+  public void cleanInactiveConcerts() {
+    Set<Long> openConcertIds = getOpenConcertIds();
+    for (Long concertId : openConcertIds) {
+      cleanupForConcert(concertId);
+      cleanupActiveForConcert(concertId);
+    }
+  }
+
+  private void cleanupForConcert(Long concertId) {
+    String queueKey = QueueRedisKey.queue(concertId);
+    Set<Object> members = redisTemplate.opsForZSet().range(queueKey, 0, -1);
+
+    if (members == null || members.isEmpty()) { // 대기열이 비어 있을 경우 불필요한 순회 방지
+      return;
+    }
+
+    for (Object userId : members) {
+      Long userIdLong = Long.valueOf(userId.toString());
+      String heartbeatKey = QueueRedisKey.heartbeat(concertId, userIdLong);
+      Boolean exists = redisTemplate.hasKey(heartbeatKey);
+
+      if (Boolean.FALSE.equals(exists)) {
+        redisTemplate.opsForZSet().remove(queueKey, userIdLong);
+        log.info("Queue 이탈 처리: concertId={}, userId={}", concertId, userIdLong);
+      }
+    }
+  }
+
+  private void cleanupActiveForConcert(Long concertId) {
+    String activeKey = QueueRedisKey.active(concertId);
+    Set<Object> activeUsers = redisTemplate.opsForSet().members(activeKey);
+
+    if (activeUsers == null || activeUsers.isEmpty()) {
+      return;
+    }
+
+    for (Object userId : activeUsers) {
+      Long userIdLong = Long.valueOf(userId.toString());
+      String tokenKey = QueueRedisKey.token(concertId, userIdLong);
+      Boolean exists = redisTemplate.hasKey(tokenKey);
+
+      if (Boolean.FALSE.equals(exists)) {
+        redisTemplate.opsForSet().remove(activeKey, userIdLong);
+        log.info("Active 이탈 처리: concertId={}, userId={}", concertId, userIdLong);
+      }
+    }
+  }
+
   private Set<Long> getOpenConcertIds() {
     String key = QueueRedisKey.openConcerts();
     Set<Object> members = redisTemplate.opsForSet().members(key);
@@ -69,9 +118,7 @@ public class QueueScheduler {
 
       String tokenKey = QueueRedisKey.token(concertId, userId);
       Map<String, Object> tokenData =
-          Map.of(
-              "tokenId", UUID.randomUUID().toString(),
-              "enteredAt", System.currentTimeMillis());
+          Map.of("tokenId", UUID.randomUUID().toString(), "enteredAt", System.currentTimeMillis());
       redisTemplate.opsForValue().set(tokenKey, tokenData, Duration.ofMinutes(10));
 
       log.info("입장 처리: concertId={}, userId={}", concertId, userId);

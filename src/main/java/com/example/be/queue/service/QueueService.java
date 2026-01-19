@@ -4,6 +4,7 @@ import com.example.be.queue.dto.QueueStatusResponse;
 import com.example.be.queue.exception.QueueErrorCode;
 import com.example.be.queue.exception.QueueException;
 import com.example.be.queue.util.QueueRedisKey;
+import java.time.Duration;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -18,12 +19,7 @@ public class QueueService {
   private final RedisTemplate<String, Object> redisTemplate;
 
   public QueueStatusResponse enter(Long concertId, Long userId) {
-    String activeKey = QueueRedisKey.active(concertId);
-    Boolean isActive = redisTemplate.opsForSet().isMember(activeKey, userId);
-
-    if (Boolean.TRUE.equals(isActive)) {
-      throw new QueueException(QueueErrorCode.ALREADY_ACTIVE);
-    }
+    validateNotActive(concertId, userId);
 
     String queueKey = QueueRedisKey.queue(concertId);
     Double existingScore = redisTemplate.opsForZSet().score(queueKey, userId);
@@ -35,6 +31,8 @@ public class QueueService {
     double newScore = System.currentTimeMillis();
     redisTemplate.opsForZSet().add(queueKey, userId, newScore);
     redisTemplate.opsForSet().add(QueueRedisKey.openConcerts(), concertId);
+
+    addHeartbeat(concertId, userId);
 
     return getQueueStatusResponse(userId, queueKey);
   }
@@ -54,6 +52,8 @@ public class QueueService {
       throw new QueueException(QueueErrorCode.NOT_IN_QUEUE);
     }
 
+    refreshHeartbeat(concertId, userId); // 연결 확인, 하트비트 갱신
+
     return getQueueStatusResponse(userId, queueKey);
   }
 
@@ -71,8 +71,27 @@ public class QueueService {
   }
 
   private Long calculateEstimatedTime(Long rank) {
-    long waitingAhead = rank - 1;
+    long waitingAhead = rank;
     long cycles = (waitingAhead / PROCESS_RATE) + 1;
     return cycles * SCHEDULER_INTERVAL;
+  }
+
+  private void validateNotActive(Long concertId, Long userId) {
+    String activeKey = QueueRedisKey.active(concertId);
+    Boolean isActive = redisTemplate.opsForSet().isMember(activeKey, userId);
+
+    if (Boolean.TRUE.equals(isActive)) {
+      throw new QueueException(QueueErrorCode.ALREADY_ACTIVE);
+    }
+  }
+
+  private void addHeartbeat(Long concertId, Long userId) {
+    String heartbeatKey = QueueRedisKey.heartbeat(concertId, userId);
+    redisTemplate.opsForValue().set(heartbeatKey, "1", Duration.ofSeconds(30));
+  }
+
+  private void refreshHeartbeat(Long concertId, Long userId) {
+    String heartbeatKey = QueueRedisKey.heartbeat(concertId, userId);
+    redisTemplate.opsForValue().set(heartbeatKey, "1", Duration.ofSeconds(30));
   }
 }

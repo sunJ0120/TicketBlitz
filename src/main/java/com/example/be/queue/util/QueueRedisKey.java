@@ -6,6 +6,8 @@ public final class QueueRedisKey {
   private static final String ACTIVE_PREFIX = "active:concert:";
   private static final String TOKEN_PREFIX = "token:concert:";
   private static final String META_PREFIX = "meta:concert:";
+  private static final String OPEN_CONCERTS = "open:concerts";
+  private static final String HEARTBEAT_PREFIX = "heartbeat:concert:";
 
   private QueueRedisKey() {}
 
@@ -26,6 +28,10 @@ public final class QueueRedisKey {
   }
 
   public static String openConcerts() {
-    return "open:concerts";
+    return OPEN_CONCERTS;
+  }
+
+  public static String heartbeat(Long concertId, Long userId) {
+    return HEARTBEAT_PREFIX + concertId + ":user:" + userId;
   }
 }

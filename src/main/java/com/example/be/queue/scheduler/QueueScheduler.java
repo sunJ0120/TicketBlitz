@@ -40,6 +40,7 @@ public class QueueScheduler {
         redisTemplate.opsForSet().members(QueueRedisKey.openConcerts());
     for (Object concertId : openConcerts) {
       cleanupForConcert((Long) concertId);
+      cleanupActiveForConcert((Long) concertId);
     }
   }
 
@@ -57,6 +58,25 @@ public class QueueScheduler {
 
       if (Boolean.FALSE.equals(exists)) {
         redisTemplate.opsForZSet().remove(queueKey, userId);
+      }
+    }
+  }
+
+  private void cleanupActiveForConcert(Long concertId) {
+    String activeKey = QueueRedisKey.active(concertId);
+    Set<Object> activeUsers = redisTemplate.opsForZSet().range(activeKey, 0, -1);
+
+    if (activeUsers == null || activeUsers.isEmpty()) {
+      return;
+    }
+
+    for (Object userId : activeUsers) {
+      String tokenKey = QueueRedisKey.token(concertId, (Long) userId);
+      Boolean exists = redisTemplate.hasKey(tokenKey);
+
+      if (Boolean.FALSE.equals(exists)) {
+        redisTemplate.opsForSet().remove(activeKey, userId);
+        log.info("Active 이탈 처리: concertId={}, userId={}", concertId, userId);
       }
     }
   }
@@ -96,9 +116,7 @@ public class QueueScheduler {
 
       String tokenKey = QueueRedisKey.token(concertId, userId);
       Map<String, Object> tokenData =
-          Map.of(
-              "tokenId", UUID.randomUUID().toString(),
-              "enteredAt", System.currentTimeMillis());
+          Map.of("tokenId", UUID.randomUUID().toString(), "enteredAt", System.currentTimeMillis());
       redisTemplate.opsForValue().set(tokenKey, tokenData, Duration.ofMinutes(10));
 
       log.info("입장 처리: concertId={}, userId={}", concertId, userId);

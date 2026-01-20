@@ -2,6 +2,8 @@ package com.example.be.websocket.interceptor;
 
 import com.example.be.security.jwt.JwtProvider;
 import com.example.be.websocket.dto.StompPrincipal;
+import com.example.be.websocket.exception.WebSocketAuthException;
+import com.example.be.websocket.exception.WebSocketErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.Message;
@@ -26,25 +28,30 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
     StompHeaderAccessor accessor =
         MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
     // CONNECT 명령일 때만 인증 처리 >> 만약 메시지 타입이 CONNECT라면, 헤더에서 토큰을 꺼내 유효성을 검사한다.
-    if (StompCommand.CONNECT.equals(accessor.getCommand())) {
-      String authHeader = accessor.getFirstNativeHeader(AUTHORIZATION_HEADER);
-
-      if (authHeader != null && authHeader.startsWith(AUTHORIZATION_HEADER_PREFIX)) {
-        String token = authHeader.substring(AUTHORIZATION_HEADER_PREFIX.length());
-
-        if (jwtProvider.validateToken(token)) { // 인증 완료 시 userId 꺼내기
-          Long userId = jwtProvider.getUserId(token);
-          accessor.setUser(new StompPrincipal(userId)); // WebSocket 세션에 사용자 정보 저장
-          log.info("WebSocket 연결 성공 - userId: {}", userId);
-        } else {
-          log.warn("WebSocket 연결 실패 - 유효하지 않은 토큰");
-          throw new IllegalArgumentException("Invalid JWT token");
-        }
-      } else {
-        log.warn("WebSocket 연결 실패 - Authorization 헤더 없음");
-        throw new IllegalArgumentException("Missing Authorization header");
-      }
+    if (!StompCommand.CONNECT.equals(accessor.getCommand())) {
+      return message;
     }
+
+    String authHeader = accessor.getFirstNativeHeader(AUTHORIZATION_HEADER);
+
+    if (authHeader == null) {
+      throw new WebSocketAuthException(WebSocketErrorCode.MISSING_AUTH_HEADER);
+    }
+
+    if (!authHeader.startsWith(AUTHORIZATION_HEADER_PREFIX)) {
+      throw new WebSocketAuthException(WebSocketErrorCode.INVALID_TOKEN_FORMAT);
+    }
+
+    String token = authHeader.substring(AUTHORIZATION_HEADER_PREFIX.length());
+
+    if (!jwtProvider.validateToken(token)) {
+      throw new WebSocketAuthException(WebSocketErrorCode.INVALID_TOKEN);
+    }
+
+    Long userId = jwtProvider.getUserId(token);
+    accessor.setUser(new StompPrincipal(userId)); // WebSocket 세션에 사용자 정보 저장
+    log.info("WebSocket 연결 성공 - userId: {}", userId);
+
     return message;
   }
 }

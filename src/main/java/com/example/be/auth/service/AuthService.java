@@ -86,8 +86,7 @@ public class AuthService {
     User newUser = User.builder().email(email).password(null).name(name).role(Role.USER).build();
     userRepository.save(newUser);
 
-    SocialAccount newSocialAccount =
-        createSocialAccount(providerEnum, providerId, existingUser.get());
+    SocialAccount newSocialAccount = createSocialAccount(providerEnum, providerId, newUser);
     socialAccountRepository.save(newSocialAccount);
 
     return createTokens(newUser);

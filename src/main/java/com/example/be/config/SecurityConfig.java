@@ -2,10 +2,12 @@ package com.example.be.config;
 
 import com.example.be.auth.service.RedisTokenService;
 import com.example.be.auth.util.OAuthLoginSuccessHandler;
+import com.example.be.auth.validator.AuthValidator;
 import com.example.be.security.jwt.JwtAuthenticationFilter;
 import com.example.be.security.jwt.JwtProvider;
-import com.example.be.security.jwt.JwtUtils;
+
 import java.util.List;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -26,39 +28,40 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
-  @Value("${app.frontend-url}")
-  private List<String> allowedOrigins;
+    @Value("${app.frontend-url}")
+    private List<String> allowedOrigins;
 
-  private final JwtProvider jwtProvider;
-  private final RedisTokenService redisTokenService;
-  private final JwtUtils jwtUtils;
-  private final OAuthLoginSuccessHandler oAuthLoginSuccessHandler;
+    private final JwtProvider jwtProvider;
+    private final RedisTokenService redisTokenService;
+    private final JwtUtils jwtUtils;
+    private final OAuthLoginSuccessHandler oAuthLoginSuccessHandler;
+    private final AuthValidator authValidator;
 
-  @Bean
-  public PasswordEncoder passwordEncoder() {
-    return new BCryptPasswordEncoder();
-  }
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
 
-  @Bean
-  public CorsConfigurationSource corsConfigurationSource() {
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
 
-    CorsConfiguration configuration = new CorsConfiguration();
+        CorsConfiguration configuration = new CorsConfiguration();
 
-    configuration.setAllowedOrigins(allowedOrigins);
-    configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-    configuration.setAllowedHeaders(List.of("*"));
-    configuration.setAllowCredentials(true);
-    configuration.setExposedHeaders(List.of("Authorization", "Location"));
+        configuration.setAllowedOrigins(allowedOrigins);
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowCredentials(true);
+        configuration.setExposedHeaders(List.of("Authorization", "Location"));
 
-    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-    source.registerCorsConfiguration("/**", configuration);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
 
-    return source;
-  }
+        return source;
+    }
 
-  @Bean
-  public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-    // @formatter:off
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        // @formatter:off
     http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
         .csrf(csrf -> csrf.disable())
         .sessionManagement(
@@ -88,7 +91,7 @@ public class SecurityConfig {
         .formLogin(form -> form.disable())
         .httpBasic(httpBasic -> httpBasic.disable())
         .addFilterBefore(
-            new JwtAuthenticationFilter(jwtProvider, redisTokenService, jwtUtils),
+            new JwtAuthenticationFilter(authValidator, jwtProvider, redisTokenService),
             UsernamePasswordAuthenticationFilter.class);
 
     return http.build();

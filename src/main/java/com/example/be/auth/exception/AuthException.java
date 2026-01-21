@@ -1,7 +1,11 @@
 package com.example.be.auth.exception;
 
-public class AuthException extends RuntimeException {
-  public AuthException(String message) {
-    super(message);
+import com.example.be.common.exception.BusinessException;
+import lombok.Getter;
+
+@Getter
+public class AuthException extends BusinessException {
+  public AuthException(AuthErrorCode errorCode) {
+    super(errorCode);
   }
 }

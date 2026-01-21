@@ -29,7 +29,6 @@ spring: # dev 환경
     username: ${MYSQL_USER}
     password: ${MYSQL_PASSWORD}
   jpa:
-    database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
       ddl-auto: update
     properties:
@@ -42,6 +41,7 @@ spring: # dev 환경
       host: localhost
       port: 6379
       password: ${SPRING_DATA_REDIS_PASSWORD}
+
 logging:
   level:
     org.springframework.jdbc.datasource.init: DEBUG
@@ -54,9 +54,8 @@ jwt:
   access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION}
   refresh-token-expiration: ${JWT_REFRESH_TOKEN_EXPIRATION}
 
-cors:
-  allowed-origins:
-    - http://localhost:5173
+app:
+  frontend-url: http://localhost:5173
 
 ---
 
@@ -96,9 +95,6 @@ spring: # prod 환경
   jpa:
     hibernate:
       ddl-auto: validate  # prod 환경에서는 테이블 자동 수정을 막기 위해 validate 설정
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.MySQL8Dialect
 
 logging:
   level:
@@ -109,5 +105,5 @@ jwt:
   access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION}
   refresh-token-expiration: ${JWT_REFRESH_TOKEN_EXPIRATION}
 
-cors:
-  allowed-origins: ${FRONT_DOMAIN}
+app:
+  frontend-url: ${FRONT_DOMAIN}

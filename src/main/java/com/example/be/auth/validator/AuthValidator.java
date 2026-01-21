@@ -11,35 +11,35 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class AuthValidator {
 
-    private final JwtProvider jwtProvider;
+  private final JwtProvider jwtProvider;
 
-    public String validateRefreshToken(String token) {
-        try {
-            String type = jwtProvider.getTokenType(token);
+  public String validateRefreshToken(String token) {
+    try {
+      String type = jwtProvider.getTokenType(token);
 
-            if (!type.equals("REFRESH")) {
-                throw new AuthException(AuthErrorCode.TOKEN_INVALID);
-            }
-            return token;
-        } catch (JwtException e) {
-            throw new AuthException(AuthErrorCode.TOKEN_INVALID);
-        }
+      if (!type.equals("REFRESH")) {
+        throw new AuthException(AuthErrorCode.TOKEN_INVALID);
+      }
+      return token;
+    } catch (JwtException e) {
+      throw new AuthException(AuthErrorCode.TOKEN_INVALID);
+    }
+  }
+
+  public String validateAccessToken(String token) {
+    if (token == null || token.isEmpty()) {
+      throw new AuthException(AuthErrorCode.TOKEN_INVALID);
     }
 
-    public String validateAccessToken(String token) {
-        if (token == null || token.isEmpty()) {
-            throw new AuthException(AuthErrorCode.TOKEN_INVALID);
-        }
+    try {
+      String type = jwtProvider.getTokenType(token);
 
-        try {
-            String type = jwtProvider.getTokenType(token);
-
-            if (!type.equals("ACCESS")) {
-                throw new AuthException(AuthErrorCode.TOKEN_INVALID);
-            }
-            return token;
-        } catch (JwtException e) {
-            throw new AuthException(AuthErrorCode.TOKEN_INVALID);
-        }
+      if (!type.equals("ACCESS")) {
+        throw new AuthException(AuthErrorCode.TOKEN_INVALID);
+      }
+      return token;
+    } catch (JwtException e) {
+      throw new AuthException(AuthErrorCode.TOKEN_INVALID);
     }
+  }
 }

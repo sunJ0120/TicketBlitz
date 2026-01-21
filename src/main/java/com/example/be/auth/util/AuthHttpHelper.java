@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 public class AuthHttpHelper {
 
   private static final String REFRESH_TOKEN_NAME = "refresh_token";
-  private static final String REFRESH_REQUEST_URL = "/api/v1/auth/refresh";
+  private static final String REFRESH_REQUEST_URL = "/"; // 서비스 전역에서 쿠키를 인식할 수 있도록 설정
   private static final int REFRESH_TOKEN_MAX_AGE_SECONDS = 60 * 60;
 
   public String extractRefreshToken(HttpServletRequest request) {

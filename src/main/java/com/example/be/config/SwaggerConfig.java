@@ -28,7 +28,7 @@ public class SwaggerConfig {
   // Auth 도메인
   @Bean
   public GroupedOpenApi authApi() {
-    return GroupedOpenApi.builder().group("1. Auth").pathsToMatch("/auth/**").build();
+    return GroupedOpenApi.builder().group("1. Auth").pathsToMatch("/api/v1/auth/**").build();
   }
 
   // Page (common) 도메인
@@ -37,21 +37,15 @@ public class SwaggerConfig {
     return GroupedOpenApi.builder().group("2. Page").pathsToMatch("/api/v1/pages/**").build();
   }
 
-  // User 도메인
-  @Bean
-  public GroupedOpenApi userApi() {
-    return GroupedOpenApi.builder().group("3. User").pathsToMatch("/users/**").build();
-  }
-
   // Concert 도메인
   @Bean
   public GroupedOpenApi concertApi() {
-    return GroupedOpenApi.builder().group("4. Concert").pathsToMatch("/api/v1/concerts/**").build();
+    return GroupedOpenApi.builder().group("3. Concert").pathsToMatch("/api/v1/concerts/**").build();
   }
 
   // Queue 도메인
   @Bean
   public GroupedOpenApi queueApi() {
-    return GroupedOpenApi.builder().group("5. Queue").pathsToMatch("/api/v1/queue/**").build();
+    return GroupedOpenApi.builder().group("4. Queue").pathsToMatch("/api/v1/queue/**").build();
   }
 }

@@ -8,10 +8,8 @@ import com.example.be.auth.exception.AuthException;
 import com.example.be.auth.service.AuthService;
 import com.example.be.auth.util.AuthHttpHelper;
 import com.example.be.auth.validator.AuthValidator;
-import com.example.be.security.jwt.JwtUtils;
+import com.example.be.security.jwt.JwtProvider;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -38,13 +36,12 @@ public class AuthController {
   private final AuthService authService;
   private final AuthValidator authValidator;
   private final AuthHttpHelper authHttpHelper;
-  private final JwtUtils jwtUtils;
+  private final JwtProvider jwtProvider;
 
   @Value("${app.frontend-url}")
   private String frontendUrl;
 
   @Operation(summary = "회원가입")
-  @ApiResponses({@ApiResponse(responseCode = "200", description = "회원가입 성공")})
   @PostMapping("/signup")
   public ResponseEntity<String> signup(@Valid @RequestBody SignupRequest request) {
     authService.signup(request);
@@ -52,7 +49,6 @@ public class AuthController {
   }
 
   @Operation(summary = "로그인")
-  @ApiResponses({@ApiResponse(responseCode = "200", description = "로그인 성공")})
   @PostMapping("/login")
   public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
     LoginResponse response = authService.login(request);
@@ -63,7 +59,6 @@ public class AuthController {
 
   // 소셜 로그인 구현
   @Operation(summary = "소셜 로그인")
-  @ApiResponses({@ApiResponse(responseCode = "200", description = "로그인 성공")})
   @GetMapping("/login/social")
   public void socialLogin(HttpServletRequest request, HttpServletResponse response)
       throws IOException {
@@ -93,13 +88,12 @@ public class AuthController {
   }
 
   @Operation(summary = "로그아웃")
-  @ApiResponses({@ApiResponse(responseCode = "200", description = "로그아웃 성공")})
   @PostMapping("/logout")
   @SecurityRequirement(name = "BearerAuth")
   public ResponseEntity<Void> logout(HttpServletRequest request) {
-    String token = jwtUtils.resolveToken(request);
+    String token = jwtProvider.resolveToken(request);
 
-    token = authValidator.validateAndGetToken(token);
+    token = authValidator.validateAccessToken(token);
 
     authService.logout(token);
     ResponseCookie cookie = authHttpHelper.createLogoutCookie();
@@ -112,7 +106,7 @@ public class AuthController {
   public ResponseEntity<LoginResponse> refresh(HttpServletRequest request) {
     String refreshToken = authHttpHelper.extractRefreshToken(request);
 
-    refreshToken = authValidator.validateAndGetToken(refreshToken);
+    refreshToken = authValidator.validateRefreshToken(refreshToken);
     LoginResponse response = authService.refresh(refreshToken);
 
     return buildLoginResponse(response);

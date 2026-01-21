@@ -1,5 +1,7 @@
 package com.example.be.auth.validator;
 
+import com.example.be.auth.exception.AuthErrorCode;
+import com.example.be.auth.exception.AuthException;
 import com.example.be.security.jwt.JwtProvider;
 import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
@@ -13,7 +15,7 @@ public class AuthValidator {
 
   public String validateAndGetToken(String token) throws JwtException {
     if (token == null || token.isBlank()) {
-      throw new IllegalArgumentException("토큰이 존재하지 않거나 빈 문자열입니다.");
+      throw new AuthException(AuthErrorCode.TOKEN_INVALID);
     }
 
     jwtProvider.validateToken(token);

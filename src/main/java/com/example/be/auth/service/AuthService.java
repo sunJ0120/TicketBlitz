@@ -3,6 +3,8 @@ package com.example.be.auth.service;
 import com.example.be.auth.dto.LoginRequest;
 import com.example.be.auth.dto.LoginResponse;
 import com.example.be.auth.dto.SignupRequest;
+import com.example.be.auth.exception.AuthErrorCode;
+import com.example.be.auth.exception.AuthException;
 import com.example.be.security.jwt.JwtProvider;
 import com.example.be.user.domain.SocialAccount;
 import com.example.be.user.domain.User;
@@ -12,7 +14,6 @@ import com.example.be.user.repository.SocialAccountRepository;
 import com.example.be.user.repository.UserRepository;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -32,7 +33,7 @@ public class AuthService {
   @Transactional
   public void signup(SignupRequest request) {
     if (userRepository.findByEmail(request.email()).isPresent()) {
-      throw new IllegalArgumentException("이미 존재하는 이메일입니다.");
+      throw new AuthException(AuthErrorCode.AUTH_DUPLICATE_EMAIL);
     }
 
     String encodedPassword = passwordEncoder.encode(request.password());
@@ -52,10 +53,10 @@ public class AuthService {
     User user =
         userRepository
             .findByEmail(request.email())
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 이메일입니다."));
+            .orElseThrow(() -> new AuthException(AuthErrorCode.AUTH_USER_NOT_FOUND));
 
     if (!passwordEncoder.matches(request.password(), user.getPassword())) {
-      throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
+      throw new AuthException(AuthErrorCode.AUTH_WRONG_PASSWORD);
     }
 
     return createTokens(user);
@@ -63,7 +64,12 @@ public class AuthService {
 
   @Transactional
   public LoginResponse socialLogin(String provider, String providerId, String email, String name) {
-    Provider providerEnum = Provider.valueOf(provider.toUpperCase());
+    Provider providerEnum;
+    try {
+      providerEnum = Provider.valueOf(provider.toUpperCase());
+    } catch (IllegalArgumentException e) {
+      throw new AuthException(AuthErrorCode.AUTH_BAD_REQUEST);
+    }
     // 1. 이미 해당 provider로 연동된 소셜 아이디가 있을 경우
     Optional<SocialAccount> existingSocial =
         socialAccountRepository.findByProviderAndProviderId(providerEnum, providerId);
@@ -121,7 +127,7 @@ public class AuthService {
     Role role = jwtProvider.getRole(refreshToken);
 
     if (!redisTokenService.isValidRefreshToken(userId, refreshToken)) { // Redis 서버측 검증
-      throw new BadCredentialsException("Refresh Token이 유효하지 않거나 탈취되었습니다."); // 서버 측 검증 실패 시 구체적인 예외
+      throw new AuthException(AuthErrorCode.TOKEN_INVALID); // 서버 측 검증 실패 시 구체적인 예외
     }
 
     String newAccessToken = jwtProvider.generateAccessToken(userId, role);

@@ -29,7 +29,9 @@ public enum AuthErrorCode implements ErrorCode {
 
   // 권한 관련
   AUTH_UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "AUTH_012", "인증 정보가 없습니다"),
-  AUTH_FORBIDDEN(HttpStatus.FORBIDDEN, "AUTH_013", "접근 권한이 부족합니다");
+  AUTH_FORBIDDEN(HttpStatus.FORBIDDEN, "AUTH_013", "접근 권한이 부족합니다"),
+
+  AUTH_BAD_REQUEST(HttpStatus.BAD_REQUEST, "AUTH_014", "잘못된 요청입니다");
 
   private final HttpStatus status;
   private final String code;

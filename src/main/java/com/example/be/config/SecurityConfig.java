@@ -31,7 +31,6 @@ public class SecurityConfig {
 
   private final JwtProvider jwtProvider;
   private final RedisTokenService redisTokenService;
-  private final JwtUtils jwtUtils;
   private final OAuthLoginSuccessHandler oAuthLoginSuccessHandler;
   private final AuthValidator authValidator;
 

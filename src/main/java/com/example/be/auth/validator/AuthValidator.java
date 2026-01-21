@@ -13,13 +13,29 @@ public class AuthValidator {
 
   private final JwtProvider jwtProvider;
 
-  public String validateAndGetToken(String token) throws JwtException {
-    if (token == null || token.isBlank()) {
+  public String validateRefreshToken(String token) {
+    try {
+      String type = jwtProvider.getTokenType(token);
+
+      if (!type.equals("REFRESH")) {
+        throw new AuthException(AuthErrorCode.TOKEN_INVALID);
+      }
+      return token;
+    } catch (JwtException e) {
       throw new AuthException(AuthErrorCode.TOKEN_INVALID);
     }
+  }
 
-    jwtProvider.validateToken(token);
+  public String validateAccessToken(String token) {
+    try {
+      String type = jwtProvider.getTokenType(token);
 
-    return token;
+      if (!type.equals("ACCESS")) {
+        throw new AuthException(AuthErrorCode.TOKEN_INVALID);
+      }
+      return token;
+    } catch (JwtException e) {
+      throw new AuthException(AuthErrorCode.TOKEN_INVALID);
+    }
   }
 }

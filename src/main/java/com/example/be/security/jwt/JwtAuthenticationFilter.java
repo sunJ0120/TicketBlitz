@@ -1,6 +1,11 @@
 package com.example.be.security.jwt;
 
+import com.example.be.auth.exception.AuthErrorCode;
+import com.example.be.auth.exception.AuthException;
 import com.example.be.auth.service.RedisTokenService;
+import com.example.be.auth.validator.AuthValidator;
+import com.example.be.common.exception.ErrorResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -14,49 +19,49 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @AllArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
+  private final AuthValidator authValidator;
   private final JwtProvider jwtProvider;
   private final RedisTokenService redisTokenService;
-  private final JwtUtils jwtUtils;
-
-  @Override
-  protected boolean shouldNotFilter(HttpServletRequest request) {
-    String path = request.getRequestURI();
-
-    return path.startsWith("/swagger-ui")
-        || path.startsWith("/v3/api-docs")
-        || path.startsWith("/swagger-resources")
-        || path.startsWith("/h2-console")
-        || path.startsWith("/auth");
-  }
 
   @Override
   protected void doFilterInternal(
       HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
       throws ServletException, IOException {
     // @formatter:off
-    String token = jwtUtils.resolveToken(request);
+    String token = jwtProvider.resolveToken(request);
 
+    // 토큰이 없으면 검증하지 않는다.
     if (token == null || token.isBlank()) {
       filterChain.doFilter(request, response);
       return;
     }
 
     try {
-      jwtProvider.validateToken(token);
-    } catch (io.jsonwebtoken.JwtException e) {
-      response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-      response.getWriter().println(e.getMessage());
-      return; // 필터 중단
-    }
+      authValidator.validateAccessToken(token);
 
-    if (redisTokenService.isBlacklisted(token)) {
-      response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+      if (redisTokenService.isBlacklisted(token)) {
+        handleException(response, AuthErrorCode.TOKEN_EXPIRED);
+        return;
+      }
+
+      Authentication authentication = jwtProvider.getAuthentication(token);
+      SecurityContextHolder.getContext().setAuthentication(authentication);
+    } catch (AuthException e) {
+      handleException(response, (AuthErrorCode) e.getErrorCode());
       return;
     }
-
-    Authentication authentication = jwtProvider.getAuthentication(token);
-    SecurityContextHolder.getContext().setAuthentication(authentication);
-
     filterChain.doFilter(request, response);
+  }
+
+  // exception 응답 처리를 위한 method
+  private void handleException(HttpServletResponse response, AuthErrorCode errorCode)
+      throws IOException {
+    response.setStatus(errorCode.getStatus().value());
+    response.setContentType("application/json;charset=UTF-8");
+
+    // ErrorResponse.of(errorCode) 객체를 JSON으로 변환
+    String jsonResponse = new ObjectMapper().writeValueAsString(ErrorResponse.of(errorCode));
+
+    response.getWriter().println(jsonResponse);
   }
 }

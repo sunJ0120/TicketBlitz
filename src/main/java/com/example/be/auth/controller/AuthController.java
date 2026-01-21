@@ -3,13 +3,13 @@ package com.example.be.auth.controller;
 import com.example.be.auth.dto.LoginRequest;
 import com.example.be.auth.dto.LoginResponse;
 import com.example.be.auth.dto.SignupRequest;
+import com.example.be.auth.exception.AuthErrorCode;
+import com.example.be.auth.exception.AuthException;
 import com.example.be.auth.service.AuthService;
 import com.example.be.auth.util.AuthHttpHelper;
 import com.example.be.auth.validator.AuthValidator;
-import com.example.be.security.jwt.JwtUtils;
+import com.example.be.security.jwt.JwtProvider;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,10 +19,8 @@ import java.io.IOException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -31,34 +29,26 @@ import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "Auth", description = "인증 API")
 @RestController
-@RequestMapping("/auth")
+@RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
   private final AuthService authService;
   private final AuthValidator authValidator;
   private final AuthHttpHelper authHttpHelper;
-  private final JwtUtils jwtUtils;
+  private final JwtProvider jwtProvider;
 
   @Value("${app.frontend-url}")
   private String frontendUrl;
 
-  @Operation(summary = "회원가입", description = "새로운 사용자를 등록합니다.")
-  @ApiResponses({
-    @ApiResponse(responseCode = "200", description = "회원가입 성공"),
-    @ApiResponse(responseCode = "400", description = "이미 존재하는 이메일")
-  })
+  @Operation(summary = "회원가입")
   @PostMapping("/signup")
   public ResponseEntity<String> signup(@Valid @RequestBody SignupRequest request) {
     authService.signup(request);
     return ResponseEntity.ok("회원가입 성공");
   }
 
-  @Operation(summary = "로그인", description = "이메일/비밀번호로 로그인합니다.")
-  @ApiResponses({
-    @ApiResponse(responseCode = "200", description = "로그인 성공"),
-    @ApiResponse(responseCode = "400", description = "잘못된 이메일 또는 비밀번호")
-  })
+  @Operation(summary = "로그인")
   @PostMapping("/login")
   public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
     LoginResponse response = authService.login(request);
@@ -68,11 +58,7 @@ public class AuthController {
   }
 
   // 소셜 로그인 구현
-  @Operation(summary = "소셜 로그인", description = "Oauth2 프로토콜을 활용합니다.")
-  @ApiResponses({
-    @ApiResponse(responseCode = "200", description = "로그인 성공"),
-    @ApiResponse(responseCode = "403", description = "잘못된 접근")
-  })
+  @Operation(summary = "소셜 로그인")
   @GetMapping("/login/social")
   public void socialLogin(HttpServletRequest request, HttpServletResponse response)
       throws IOException {
@@ -82,8 +68,7 @@ public class AuthController {
 
     // forward 검증
     if (request.getAttribute("OAUTH2_AUTHENTICATED") == null) {
-      response.sendError(HttpStatus.FORBIDDEN.value());
-      return;
+      throw new AuthException(AuthErrorCode.AUTH_FORBIDDEN);
     }
 
     String provider = (String) request.getAttribute("provider");
@@ -102,23 +87,13 @@ public class AuthController {
     response.sendRedirect(frontendUrl + "/oauth/callback?token=" + loginResponse.accessToken());
   }
 
-  @Operation(
-      summary = "로그아웃",
-      description = "Access Token을 블랙리스트에 등록하여 로그아웃 처리합니다.",
-      security = {@SecurityRequirement(name = "BearerAuth")})
-  @ApiResponses({
-    @ApiResponse(responseCode = "200", description = "로그아웃 성공"),
-    @ApiResponse(responseCode = "401", description = "인증 실패")
-  })
+  @Operation(summary = "로그아웃")
   @PostMapping("/logout")
+  @SecurityRequirement(name = "BearerAuth")
   public ResponseEntity<Void> logout(HttpServletRequest request) {
-    String token = jwtUtils.resolveToken(request);
+    String token = jwtProvider.resolveToken(request);
 
-    try {
-      token = authValidator.validateAndGetToken(token);
-    } catch (io.jsonwebtoken.JwtException | IllegalArgumentException e) {
-      return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-    }
+    token = authValidator.validateAccessToken(token);
 
     authService.logout(token);
     ResponseCookie cookie = authHttpHelper.createLogoutCookie();
@@ -126,23 +101,13 @@ public class AuthController {
     return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie.toString()).build();
   }
 
+  @Operation(summary = "토큰 재발급")
   @PostMapping("/refresh")
   public ResponseEntity<LoginResponse> refresh(HttpServletRequest request) {
     String refreshToken = authHttpHelper.extractRefreshToken(request);
 
-    try {
-      refreshToken = authValidator.validateAndGetToken(refreshToken);
-    } catch (io.jsonwebtoken.JwtException | IllegalArgumentException e) {
-      return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-    }
-
-    LoginResponse response;
-
-    try {
-      response = authService.refresh(refreshToken);
-    } catch (BadCredentialsException e) {
-      return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-    }
+    refreshToken = authValidator.validateRefreshToken(refreshToken);
+    LoginResponse response = authService.refresh(refreshToken);
 
     return buildLoginResponse(response);
   }

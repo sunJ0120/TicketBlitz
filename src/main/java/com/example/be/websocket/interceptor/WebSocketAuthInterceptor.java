@@ -1,5 +1,7 @@
 package com.example.be.websocket.interceptor;
 
+import com.example.be.auth.exception.AuthException;
+import com.example.be.auth.validator.AuthValidator;
 import com.example.be.security.jwt.JwtProvider;
 import com.example.be.websocket.dto.StompPrincipal;
 import com.example.be.websocket.exception.WebSocketAuthException;
@@ -22,6 +24,7 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
   private static final String AUTHORIZATION_HEADER_PREFIX = "Bearer ";
 
   private final JwtProvider jwtProvider;
+  private final AuthValidator authValidator;
 
   @Override
   public Message<?> preSend(Message<?> message, MessageChannel channel) {
@@ -44,7 +47,9 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
 
     String token = authHeader.substring(AUTHORIZATION_HEADER_PREFIX.length());
 
-    if (!jwtProvider.validateToken(token)) {
+    try {
+      authValidator.validateAccessToken(token);
+    } catch (AuthException e) {
       throw new WebSocketAuthException(WebSocketErrorCode.INVALID_TOKEN);
     }
 

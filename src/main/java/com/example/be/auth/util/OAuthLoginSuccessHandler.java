@@ -34,7 +34,7 @@ public class OAuthLoginSuccessHandler implements AuthenticationSuccessHandler {
     request.setAttribute("name", userInfo.name());
     request.setAttribute("OAUTH2_AUTHENTICATED", true);
 
-    request.getRequestDispatcher("/auth/login/social").forward(request, response);
+    request.getRequestDispatcher("/api/v1/auth/login/social").forward(request, response);
   }
 
   private OAuthUserInfo extractUserInfo(String provider, Map<String, Object> attributes) {

@@ -2,11 +2,12 @@ package com.example.be.config;
 
 import com.example.be.auth.service.RedisTokenService;
 import com.example.be.auth.util.OAuthLoginSuccessHandler;
+import com.example.be.auth.validator.AuthValidator;
 import com.example.be.security.jwt.JwtAuthenticationFilter;
 import com.example.be.security.jwt.JwtProvider;
-import com.example.be.security.jwt.JwtUtils;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -25,11 +26,13 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
+  @Value("${app.frontend-url}")
+  private List<String> allowedOrigins;
 
   private final JwtProvider jwtProvider;
   private final RedisTokenService redisTokenService;
-  private final JwtUtils jwtUtils;
   private final OAuthLoginSuccessHandler oAuthLoginSuccessHandler;
+  private final AuthValidator authValidator;
 
   @Bean
   public PasswordEncoder passwordEncoder() {
@@ -38,9 +41,10 @@ public class SecurityConfig {
 
   @Bean
   public CorsConfigurationSource corsConfigurationSource() {
+
     CorsConfiguration configuration = new CorsConfiguration();
 
-    configuration.setAllowedOrigins(List.of("http://localhost:5173"));
+    configuration.setAllowedOrigins(allowedOrigins);
     configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
     configuration.setAllowedHeaders(List.of("*"));
     configuration.setAllowCredentials(true);
@@ -61,15 +65,9 @@ public class SecurityConfig {
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers(
-                        "/swagger-ui/**",
-                        "/swagger-ui.html",
-                        "/v3/api-docs/**",
-                        "/swagger-resources/**")
+                auth.requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-resources/**")
                     .permitAll()
-                    .requestMatchers("/auth/login/social")
-                    .permitAll()
-                    .requestMatchers("/auth/**")
+                    .requestMatchers("/api/v1/auth/**")
                     .permitAll()
                     .requestMatchers("/ws/**")
                     .permitAll()
@@ -90,7 +88,7 @@ public class SecurityConfig {
         .formLogin(form -> form.disable())
         .httpBasic(httpBasic -> httpBasic.disable())
         .addFilterBefore(
-            new JwtAuthenticationFilter(jwtProvider, redisTokenService, jwtUtils),
+            new JwtAuthenticationFilter(authValidator, jwtProvider, redisTokenService),
             UsernamePasswordAuthenticationFilter.class);
 
     return http.build();
